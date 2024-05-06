@@ -99,7 +99,7 @@
 #global rcrev   .rc0
 
 Name:           git
-Version:        2.39.3
+Version:        2.43.0
 Release:        1%{?rcrev}%{?dist}
 Summary:        Fast Version Control System
 License:        GPLv2
@@ -131,8 +131,9 @@ Source99:       print-failed-test-output
 
 # https://bugzilla.redhat.com/490602
 Patch0:         git-cvsimport-Ignore-cvsps-2.2b1-Branches-output.patch
+
 # https://bugzilla.redhat.com/1956345
-Patch1:         git-2.38.1-core-crypto-hmac.patch
+Patch1:         git-2.43.0-core-crypto-hmac.patch
 
 # https://bugzilla.redhat.com/2114531
 # tests: try harder to find open ports for apache, git, and svn
@@ -1117,9 +1118,13 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{?with_docs:%{_pkgdocdir}/git-svn.html}
 
 %changelog
+* Wed Dec 06 2023 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.0-1
+- Update to 2.43.0
+- Resolves: RHEL-17100
+
 * Wed Apr 26 2023 Ondřej Pohořelský <opohorel@redhat.com> - 2.39.3-1
 - Update to 2.39.3
-- Resolves: #2188352, #2188361, #2189976, #2189977
+- Resolves: #2188363, #2188353, #2189872, #2189873
 
 * Thu Jan 19 2023 Ondřej Pohořelský <opohorel@redhat.com> - 2.39.1-1
 - Update to 2.39.1
