@@ -1,16 +1,16 @@
-diff -ur a/builtin/receive-pack.c b/builtin/receive-pack.c
---- a/builtin/receive-pack.c	2022-10-07 06:48:26.000000000 +0200
-+++ b/builtin/receive-pack.c	2022-11-21 16:34:02.417278135 +0100
-@@ -30,6 +30,8 @@
- #include "commit-reach.h"
+diff -ur b/builtin/receive-pack.c a/builtin/receive-pack.c
+--- b/builtin/receive-pack.c	2023-11-20 03:07:41.000000000 +0100
++++ a/builtin/receive-pack.c	2023-12-06 15:34:28.294170714 +0100
+@@ -40,6 +40,8 @@
  #include "worktree.h"
  #include "shallow.h"
+ #include "parse-options.h"
 +#include <openssl/hmac.h>	
 +#include <openssl/evp.h>
  
  static const char * const receive_pack_usage[] = {
  	N_("git receive-pack <git-dir>"),
-@@ -528,43 +530,11 @@
+@@ -538,43 +540,11 @@
  	return 0;
  }
  
@@ -56,10 +56,10 @@ diff -ur a/builtin/receive-pack.c b/builtin/receive-pack.c
  }
  
  static char *prepare_push_cert_nonce(const char *path, timestamp_t stamp)
-diff -ur a/Makefile b/Makefile
---- a/Makefile	2022-10-07 06:48:26.000000000 +0200
-+++ b/Makefile	2022-11-21 16:35:56.986792752 +0100
-@@ -2008,6 +2008,8 @@
+diff -ur b/Makefile a/Makefile
+--- b/Makefile	2023-11-20 03:07:41.000000000 +0100
++++ a/Makefile	2023-12-06 15:35:08.506316431 +0100
+@@ -2123,6 +2123,8 @@
  	EXTLIBS += -lcrypto -lssl
  endif
  
