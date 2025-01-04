@@ -100,7 +100,7 @@
 
 Name:           git
 Version:        2.43.5
-Release:        1%{?rcrev}%{?dist}
+Release:        2%{?rcrev}%{?dist}
 Summary:        Fast Version Control System
 License:        GPLv2
 URL:            https://git-scm.com/
@@ -144,6 +144,11 @@ Patch2:         0001-t-lib-httpd-try-harder-to-find-a-port-for-apache.patch
 Patch3:         0002-t-lib-git-daemon-try-harder-to-find-a-port.patch
 # https://github.com/tmzullinger/git/commit/aa5105dc11
 Patch4:         0003-t-lib-git-svn-try-harder-to-find-a-port.patch
+
+# attr: read attributes from HEAD when bare repo
+#
+# https://github.com/git/git/commit/2386535511d1181afd4e892e2a866ffe5e1d7d21
+Patch5:         git-2.43.5-slow-shallow-clones.patch
 
 %if %{with docs}
 # pod2man is needed to build Git.3pm
@@ -1118,13 +1123,13 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{?with_docs:%{_pkgdocdir}/git-svn.html}
 
 %changelog
-* Wed Jun 05 2024 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.5-1
-- Update to 2.43.5
-- Related: RHEL-36402, RHEL-36414
+* Thu Nov 14 2024 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.5-2
+- Add fix for extremely slow shallow clones
+- Resolves: RHEL-67118
 
-* Wed May 15 2024 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.4-1
-- Update to 2.43.4
-- Resolves: RHEL-36402, RHEL-36414
+* Thu Jun 27 2024 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.5-1
+- Update to 2.43.5
+- Resolves: RHEL-36353, RHEL-36357, RHEL-36371, RHEL-36383, RHEL-36387
 
 * Wed Dec 06 2023 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.0-1
 - Update to 2.43.0
