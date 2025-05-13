@@ -100,7 +100,7 @@
 
 Name:           git
 Version:        2.47.1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Fast Version Control System
 License:        GPLv2
 URL:            https://git-scm.com/
@@ -144,6 +144,13 @@ Patch2:         0001-t-lib-httpd-try-harder-to-find-a-port-for-apache.patch
 Patch3:         0002-t-lib-git-daemon-try-harder-to-find-a-port.patch
 # https://github.com/tmzullinger/git/commit/aa5105dc11
 Patch4:         0003-t-lib-git-svn-try-harder-to-find-a-port.patch
+
+# Adds the option to sanitize sideband channel messages
+# CVE-2024-52005 wasn't fixed by upstream. This patch adds the option to harden Git against it.
+# The default behaviour of Git remains unchanged.
+#
+# https://github.com/gitgitgadget/git/pull/1853 
+Patch5:         git-2.47-sanitize-sideband-channel-messages.patch
 
 %if %{with docs}
 # pod2man is needed to build Git.3pm
@@ -1124,6 +1131,10 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{?with_docs:%{_pkgdocdir}/git-svn.html}
 
 %changelog
+* Mon Mar 31 2025 Ondřej Pohořelský <opohorel@redhat.com> - 2.47.1-2
+- add the option to sanitize sideband channel messages
+- Resolves: RHEL-84513
+
 * Thu Nov 28 2024 Ondřej Pohořelský <opohorel@redhat.com> - 2.47.1-1
 - update to 2.47.1
 - Resolves: RHEL-63964
