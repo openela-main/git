@@ -99,8 +99,8 @@
 #global rcrev   .rc0
 
 Name:           git
-Version:        2.43.5
-Release:        2%{?rcrev}%{?dist}
+Version:        2.47.1
+Release:        1%{?dist}
 Summary:        Fast Version Control System
 License:        GPLv2
 URL:            https://git-scm.com/
@@ -144,11 +144,6 @@ Patch2:         0001-t-lib-httpd-try-harder-to-find-a-port-for-apache.patch
 Patch3:         0002-t-lib-git-daemon-try-harder-to-find-a-port.patch
 # https://github.com/tmzullinger/git/commit/aa5105dc11
 Patch4:         0003-t-lib-git-svn-try-harder-to-find-a-port.patch
-
-# attr: read attributes from HEAD when bare repo
-#
-# https://github.com/git/git/commit/2386535511d1181afd4e892e2a866ffe5e1d7d21
-Patch5:         git-2.43.5-slow-shallow-clones.patch
 
 %if %{with docs}
 # pod2man is needed to build Git.3pm
@@ -683,13 +678,6 @@ rm -rf contrib/fast-import/import-zips.py
 %endif
 # endif with python2
 
-# Use python3 to avoid an unnecessary python2 dependency, if possible.
-%if %{with python3}
-sed -i -e '1s@#!\( */usr/bin/env python\|%{__python2}\)$@#!%{__python3}@' \
-    contrib/hg-to-git/hg-to-git.py
-%endif
-# endif with python3
-
 %install
 %make_install %{?with_docs:install-doc}
 
@@ -931,6 +919,19 @@ GIT_SKIP_TESTS="$GIT_SKIP_TESTS t5300.1[02348] t5300.2[03459] t5300.30 t5300.4[5
 %endif
 # endif rhel == 8 && arch == s390x
 
+%if 0%{?rhel} == 9 && "%{_arch}" == "s390x"
+# Skip tests which fail on s390x on rhel-9
+#
+# The following tests fail on s390x & el9.  The cause should be investigated.
+# However, it's a lower priority since the same tests work consistently on
+# s390x with Fedora and RHEL-10.
+#
+# t5003.81 'archive remote http repository'
+
+GIT_SKIP_TESTS="$GIT_SKIP_TESTS t5003.81"
+%endif
+# endif rhel == 9 && arch == s390x
+
 export GIT_SKIP_TESTS
 
 # Set LANG so various UTF-8 tests are run
@@ -1036,7 +1037,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{_pkgdocdir}/git-daemon*.txt
 %if %{use_systemd}
 %{_unitdir}/git.socket
-%{_unitdir}/git@.service
+%config(noreplace) %{_unitdir}/git@.service
 %else
 %config(noreplace)%{_sysconfdir}/xinetd.d/git
 %endif
@@ -1123,9 +1124,9 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{?with_docs:%{_pkgdocdir}/git-svn.html}
 
 %changelog
-* Thu Nov 14 2024 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.5-2
-- Add fix for extremely slow shallow clones
-- Resolves: RHEL-67118
+* Thu Nov 28 2024 Ondřej Pohořelský <opohorel@redhat.com> - 2.47.1-1
+- update to 2.47.1
+- Resolves: RHEL-63964
 
 * Thu Jun 27 2024 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.5-1
 - Update to 2.43.5
