@@ -99,8 +99,8 @@
 #global rcrev   .rc0
 
 Name:           git
-Version:        2.47.1
-Release:        2%{?dist}
+Version:        2.47.3
+Release:        1%{?dist}
 Summary:        Fast Version Control System
 License:        GPLv2
 URL:            https://git-scm.com/
@@ -1131,6 +1131,10 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{?with_docs:%{_pkgdocdir}/git-svn.html}
 
 %changelog
+* Thu Jul 10 2025 Ondřej Pohořelský <opohorel@redhat.com> - 2.47.3-1
+- update to 2.47.3
+- Resolves: RHEL-102449, RHEL-102463, RHEL-102675, RHEL-102681
+
 * Mon Mar 31 2025 Ondřej Pohořelský <opohorel@redhat.com> - 2.47.1-2
 - add the option to sanitize sideband channel messages
 - Resolves: RHEL-84513
