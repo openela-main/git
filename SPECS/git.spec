@@ -92,8 +92,8 @@
 #global rcrev   .rc0
 
 Name:           git
-Version:        2.43.5
-Release:        3%{?rcrev}%{?dist}
+Version:        2.43.7
+Release:        1%{?rcrev}%{?dist}
 Summary:        Fast Version Control System
 License:        GPLv2
 URL:            https://git-scm.com/
@@ -149,6 +149,11 @@ Patch6:         git-2.43.0-slow-shallow-clones.patch
 #
 # https://github.com/gitgitgadget/git/pull/1853
 Patch7:         git-2.43.5-sanitize-sideband-channel-messages.patch
+
+# t: avoid git config syntax from newer releases
+#
+# https://github.com/git/git/commit/428c9241c6918f52ac22fb8e83ce7c736a2f5e00
+Patch8:         git-2.43.7-t-avoid-git-config-syntax-from-newer-releases.patch
 
 %if %{with docs}
 # pod2man is needed to build Git.3pm
@@ -1111,6 +1116,10 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{?with_docs:%{_pkgdocdir}/git-svn.html}
 
 %changelog
+* Fri Jul 11 2025 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.7-1
+- update to 2.43.7
+- Resolves: RHEL-102440, RHEL-102454, RHEL-102674, RHEL-102680
+
 * Fri Apr 04 2025 Ondřej Pohořelský <opohorel@redhat.com> - 2.43.5-3
 - add the option to sanitize sideband channel messages
 - Resolves: RHEL-74177
