@@ -78,7 +78,7 @@
 %global _package_note_file  %{_builddir}/%{name}-%{real_version}/.package_note-%{name}-%{version}-%{release}.%{_arch}.ld
 
 Name:           git
-Version:        2.47.3
+Version:        2.52.0
 Release:        1%{?dist}
 Summary:        Fast Version Control System
 License:        BSD-3-Clause AND GPL-2.0-only AND GPL-2.0-or-later AND LGPL-2.1-or-later AND MIT
@@ -118,15 +118,18 @@ Source99:       print-failed-test-output
 # https://bugzilla.redhat.com/490602
 Patch0:         git-cvsimport-Ignore-cvsps-2.2b1-Branches-output.patch
 
+# https://bugzilla.redhat.com/1956345
+Patch1:         git-2.52-core-crypto-hmac.patch
+
 # https://bugzilla.redhat.com/2114531
 # tests: try harder to find open ports for apache, git, and svn
 #
 # https://github.com/tmzullinger/git/commit/aedeaaf788
-Patch1:         0001-t-lib-httpd-try-harder-to-find-a-port-for-apache.patch
+Patch2:         0001-t-lib-httpd-try-harder-to-find-a-port-for-apache.patch
 # https://github.com/tmzullinger/git/commit/16750d024c
-Patch2:         0002-t-lib-git-daemon-try-harder-to-find-a-port.patch
+Patch3:         0002-t-lib-git-daemon-try-harder-to-find-a-port.patch
 # https://github.com/tmzullinger/git/commit/aa5105dc11
-Patch3:         0003-t-lib-git-svn-try-harder-to-find-a-port.patch
+Patch4:         0003-t-lib-git-svn-try-harder-to-find-a-port.patch
 
 # Configurates Apache test server to use `DavLockDBType sdbm`
 # Prevents t5540 failures on i686, s390x and ppc64le
@@ -136,8 +139,8 @@ Patch5:         git-test-apache-davlockdbtype-config.patch
 # CVE-2024-52005 wasn't fixed by upstream. This patch adds the option to harden Git against it.
 # The default behaviour of Git remains unchanged.
 #
-# https://github.com/gitgitgadget/git/pull/1853 
-Patch6:         git-2.47-sanitize-sideband-channel-messages.patch
+# https://github.com/gitgitgadget/git/pull/1853
+Patch6:         git-2.52-sanitize-sideband-channel-messages.patch
 
 %if %{with docs}
 # pod2man is needed to build Git.3pm
@@ -543,7 +546,7 @@ install -p -m 755 %{SOURCE99} print-failed-test-output
 # Remove git-archimport
 sed -i '/^SCRIPT_PERL += git-archimport\.perl$/d' Makefile
 sed -i '/^git-archimport/d' command-list.txt
-rm git-archimport.perl Documentation/git-archimport.txt
+rm git-archimport.perl Documentation/git-archimport.adoc
 
 %if %{without cvs}
 # Remove git-cvs* from command list
@@ -605,6 +608,9 @@ EOF
 %endif
 # endif ! defined perl_bootstrap
 
+# Exclude sample hook files from automatic dependency detection
+%global __requires_exclude_from ^%{_datadir}/git-core/templates/hooks/.*sample$
+
 # Remove Git::LoadCPAN to ensure we use only system perl modules.  This also
 # allows the dependencies to be automatically processed by rpm.
 rm -rf perl/Git/LoadCPAN{.pm,/}
@@ -616,7 +622,7 @@ sed -i 's@"++GITWEB_HOME_LINK_STR++"@$ENV{"SERVER_NAME"} ? "git://" . $ENV{"SERV
 
 # Move contrib/{contacts,subtree} docs to Documentation so they build with the
 # proper asciidoc/docbook/xmlto options
-mv contrib/{contacts,subtree}/git-*.txt Documentation/
+mv contrib/{contacts,subtree}/git-*.adoc Documentation/
 
 %build
 # Improve build reproducibility
@@ -734,13 +740,6 @@ mkdir -p %{buildroot}%{_datadir}/git-core/contrib/completion
 install -pm 644 contrib/completion/git-completion.tcsh \
     %{buildroot}%{_datadir}/git-core/contrib/completion/
 
-# Move contrib/hooks out of %%docdir
-mkdir -p %{buildroot}%{_datadir}/git-core/contrib
-mv contrib/hooks %{buildroot}%{_datadir}/git-core/contrib
-pushd contrib > /dev/null
-ln -s ../../../git-core/contrib/hooks
-popd > /dev/null
-
 # Install git-prompt.sh
 mkdir -p %{buildroot}%{_datadir}/git-core/contrib/completion
 install -pm 644 contrib/completion/git-prompt.sh \
@@ -783,7 +782,7 @@ grep -E  "$not_core_re" bin-man-doc-files > bin-man-doc-git-files
 # contrib
 not_core_doc_re="(git-(cvs|gui|citool|daemon|instaweb|subtree))|p4|svn|email|gitk|gitweb"
 mkdir -p %{buildroot}%{_pkgdocdir}/
-cp -pr CODE_OF_CONDUCT.md README.md Documentation/*.txt Documentation/RelNotes contrib %{buildroot}%{_pkgdocdir}/
+cp -pr CODE_OF_CONDUCT.md README.md Documentation/*.adoc Documentation/RelNotes contrib %{buildroot}%{_pkgdocdir}/
 # Remove contrib/ files/dirs which have nothing useful for documentation
 rm -rf %{buildroot}%{_pkgdocdir}/contrib/{contacts,credential}/
 cp -p gitweb/INSTALL %{buildroot}%{_pkgdocdir}/INSTALL.gitweb
@@ -875,6 +874,17 @@ GIT_SKIP_TESTS="$GIT_SKIP_TESTS t5300.1[02348] t5300.2[03459] t5300.30 t5300.4[5
 %endif
 # endif rhel == 8 && arch == s390x
 
+%if "%{_arch}" == "s390x"
+# Skip tests which fail on s390x
+#
+# The following tests are failing on s390x.
+# https://lore.kernel.org/git/4dc4c8cd-c0cc-4784-8fcf-defa3a051087@mit.edu/
+#
+# t8020.16 'cross merge boundaries in blaming'
+# t8020.19 'last-modified merge undoes changes'
+GIT_SKIP_TESTS="$GIT_SKIP_TESTS t8020.16 t8020.19"
+%endif
+# endif "%{_arch}" == "s390x"
 export GIT_SKIP_TESTS
 
 # Set LANG so various UTF-8 tests are run
@@ -920,11 +930,6 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 
 %files -f bin-man-doc-git-files
 %{_datadir}/git-core/contrib/diff-highlight
-%{_datadir}/git-core/contrib/hooks/update-paranoid
-%{_datadir}/git-core/contrib/hooks/setgitperms.perl
-%{_datadir}/git-core/templates/hooks/fsmonitor-watchman.sample
-%{_datadir}/git-core/templates/hooks/pre-rebase.sample
-%{_datadir}/git-core/templates/hooks/prepare-commit-msg.sample
 
 %files all
 # No files for you!
@@ -936,11 +941,6 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %license COPYING
 # exclude is best way here because of troubles with symlinks inside git-core/
 %exclude %{_datadir}/git-core/contrib/diff-highlight
-%exclude %{_datadir}/git-core/contrib/hooks/update-paranoid
-%exclude %{_datadir}/git-core/contrib/hooks/setgitperms.perl
-%exclude %{_datadir}/git-core/templates/hooks/fsmonitor-watchman.sample
-%exclude %{_datadir}/git-core/templates/hooks/pre-rebase.sample
-%exclude %{_datadir}/git-core/templates/hooks/prepare-commit-msg.sample
 %{bash_completions_dir}/git
 %{_datadir}/git-core/
 
@@ -950,7 +950,6 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %exclude %{_pkgdocdir}/contrib/*/*.py[co]
 %endif
 # endif rhel <= 7
-%{_pkgdocdir}/contrib/hooks
 
 %if %{with libsecret}
 %files credential-libsecret
@@ -960,7 +959,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 
 %if %{with cvs}
 %files cvs
-%{_pkgdocdir}/*git-cvs*.txt
+%{_pkgdocdir}/*git-cvs*.adoc
 %{_bindir}/git-cvsserver
 %{gitexecdir}/*cvs*
 %{?with_docs:%{_mandir}/man1/*cvs*.1*}
@@ -969,7 +968,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 # endif with cvs
 
 %files daemon
-%{_pkgdocdir}/git-daemon*.txt
+%{_pkgdocdir}/git-daemon*.adoc
 %{_unitdir}/git.socket
 %config(noreplace) %{_unitdir}/git@.service
 %{gitexecdir}/git-daemon
@@ -978,13 +977,13 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{?with_docs:%{_pkgdocdir}/git-daemon*.html}
 
 %files email
-%{_pkgdocdir}/*email*.txt
+%{_pkgdocdir}/*email*.adoc
 %{gitexecdir}/*email*
 %{?with_docs:%{_mandir}/man1/*email*.1*}
 %{?with_docs:%{_pkgdocdir}/*email*.html}
 
 %files -n gitk
-%{_pkgdocdir}/*gitk*.txt
+%{_pkgdocdir}/*gitk*.adoc
 %{_bindir}/*gitk*
 %{_datadir}/gitk
 %{bash_completions_dir}/gitk
@@ -993,7 +992,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 
 %files -n gitweb
 %{_pkgdocdir}/*.gitweb
-%{_pkgdocdir}/gitweb*.txt
+%{_pkgdocdir}/gitweb*.adoc
 %{?with_docs:%{_mandir}/man1/gitweb.1*}
 %{?with_docs:%{_mandir}/man5/gitweb.conf.5*}
 %{?with_docs:%{_pkgdocdir}/gitweb*.html}
@@ -1006,8 +1005,8 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{gitexecdir}/git-citool
 %{_datadir}/applications/*git-gui.desktop
 %{_datadir}/git-gui/
-%{_pkgdocdir}/git-gui.txt
-%{_pkgdocdir}/git-citool.txt
+%{_pkgdocdir}/git-gui.adoc
+%{_pkgdocdir}/git-citool.adoc
 %{?with_docs:%{_mandir}/man1/git-gui.1*}
 %{?with_docs:%{_pkgdocdir}/git-gui.html}
 %{?with_docs:%{_mandir}/man1/git-citool.1*}
@@ -1015,7 +1014,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 
 %files instaweb
 %{gitexecdir}/git-instaweb
-%{_pkgdocdir}/git-instaweb.txt
+%{_pkgdocdir}/git-instaweb.adoc
 %{?with_docs:%{_mandir}/man1/git-instaweb.1*}
 %{?with_docs:%{_pkgdocdir}/git-instaweb.html}
 
@@ -1023,7 +1022,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %files p4
 %{gitexecdir}/*p4*
 %{gitexecdir}/mergetools/p4merge
-%{_pkgdocdir}/*p4*.txt
+%{_pkgdocdir}/*p4*.adoc
 %{?with_docs:%{_mandir}/man1/*p4*.1*}
 %{?with_docs:%{_pkgdocdir}/*p4*.html}
 %endif
@@ -1036,17 +1035,21 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 
 %files subtree
 %{gitexecdir}/git-subtree
-%{_pkgdocdir}/git-subtree.txt
+%{_pkgdocdir}/git-subtree.adoc
 %{?with_docs:%{_mandir}/man1/git-subtree.1*}
 %{?with_docs:%{_pkgdocdir}/git-subtree.html}
 
 %files svn
 %{gitexecdir}/git-svn
-%{_pkgdocdir}/git-svn.txt
+%{_pkgdocdir}/git-svn.adoc
 %{?with_docs:%{_mandir}/man1/git-svn.1*}
 %{?with_docs:%{_pkgdocdir}/git-svn.html}
 
 %changelog
+* Fri Jan 09 2026 Ondřej Pohořelský <opohorel@redhat.com> - 2.52.0-1
+- update to 2.52.0
+- Resolves: RHEL-118145, RHEL-111334
+
 * Thu Jul 10 2025 Ondřej Pohořelský <opohorel@redhat.com> - 2.47.3-1
 - update to 2.47.3
 - Resolves: RHEL-102437, RHEL-102451, RHEL-102673, RHEL-102679
