@@ -6,13 +6,6 @@
 
 %global gitexecdir          %{_libexecdir}/git-core
 
-# Settings for Fedora >= 34
-%if 0%{?fedora} >= 34
-%bcond_with                 emacs
-%else
-%bcond_without              emacs
-%endif
-
 # Settings for Fedora
 %if 0%{?fedora}
 # linkchecker is not available on EL
@@ -99,7 +92,7 @@
 #global rcrev   .rc0
 
 Name:           git
-Version:        2.47.3
+Version:        2.52.0
 Release:        1%{?dist}
 Summary:        Fast Version Control System
 License:        GPLv2
@@ -133,7 +126,7 @@ Source99:       print-failed-test-output
 Patch0:         git-cvsimport-Ignore-cvsps-2.2b1-Branches-output.patch
 
 # https://bugzilla.redhat.com/1956345
-Patch1:         git-2.43.0-core-crypto-hmac.patch
+Patch1:         git-2.52-core-crypto-hmac.patch
 
 # https://bugzilla.redhat.com/2114531
 # tests: try harder to find open ports for apache, git, and svn
@@ -149,8 +142,8 @@ Patch4:         0003-t-lib-git-svn-try-harder-to-find-a-port.patch
 # CVE-2024-52005 wasn't fixed by upstream. This patch adds the option to harden Git against it.
 # The default behaviour of Git remains unchanged.
 #
-# https://github.com/gitgitgadget/git/pull/1853 
-Patch5:         git-2.47-sanitize-sideband-channel-messages.patch
+# https://github.com/gitgitgadget/git/pull/1853
+Patch6:         git-2.52-sanitize-sideband-channel-messages.patch
 
 %if %{with docs}
 # pod2man is needed to build Git.3pm
@@ -172,10 +165,6 @@ BuildRequires:  linkchecker
 # endif with docs
 BuildRequires:  desktop-file-utils
 BuildRequires:  diffutils
-%if %{with emacs}
-BuildRequires:  emacs-common
-%endif
-# endif emacs-common
 %if 0%{?rhel} && 0%{?rhel} < 9
 # Require epel-rpm-macros for the %%gpgverify macro on EL-7/EL-8, and
 # %%build_cflags & %%build_ldflags on EL-7.
@@ -306,17 +295,6 @@ Requires:       perl(Term::ReadKey)
 %endif
 # endif ! defined perl_bootstrap
 Requires:       perl-Git = %{version}-%{release}
-
-%if %{with emacs} && %{emacs_filesystem} && %{defined _emacs_version}
-Requires:       emacs-filesystem >= %{_emacs_version}
-%endif
-# endif with emacs && emacs_filesystem
-
-# Obsolete emacs-git if it's disabled
-%if %{without emacs}
-Obsoletes:      emacs-git < %{?epoch:%{epoch}:}%{version}-%{release}
-%endif
-# endif without emacs
 
 # Obsolete git-cvs if it's disabled
 %if %{without cvs}
@@ -572,7 +550,9 @@ xz -dc '%{SOURCE0}' | %{gpgverify} --keyring='%{SOURCE2}' --signature='%{SOURCE1
 install -p -m 755 %{SOURCE99} print-failed-test-output
 
 # Remove git-archimport from command list
+sed -i '/^SCRIPT_PERL += git-archimport\.perl$/d' Makefile
 sed -i '/^git-archimport/d' command-list.txt
+rm git-archimport.perl Documentation/git-archimport.adoc
 
 %if %{without cvs}
 # Remove git-cvs* from command list
@@ -642,6 +622,9 @@ chmod +x %{__perl_requires}
 %endif
 # endif use_new_rpm_filters
 
+# Exclude sample hook files from automatic dependency detection
+%global __requires_exclude_from ^%{_datadir}/git-core/templates/hooks/.*sample$
+
 # Remove Git::LoadCPAN to ensure we use only system perl modules.  This also
 # allows the dependencies to be automatically processed by rpm.
 rm -rf perl/Git/LoadCPAN{.pm,/}
@@ -653,7 +636,7 @@ sed -i 's@"++GITWEB_HOME_LINK_STR++"@$ENV{"SERVER_NAME"} ? "git://" . $ENV{"SERV
 
 # Move contrib/{contacts,subtree} docs to Documentation so they build with the
 # proper asciidoc/docbook/xmlto options
-mv contrib/{contacts,subtree}/git-*.txt Documentation/
+mv contrib/{contacts,subtree}/git-*.adoc Documentation/
 
 %build
 # Improve build reproducibility
@@ -689,19 +672,6 @@ rm -rf contrib/fast-import/import-zips.py
 %make_install %{?with_docs:install-doc}
 
 %make_install -C contrib/contacts
-
-%if %{with emacs}
-%global elispdir %{_emacs_sitelispdir}/git
-pushd contrib/emacs >/dev/null
-for el in *.el ; do
-    # Note: No byte-compiling is done.  These .el files are one-line stubs
-    # which only serve to point users to better alternatives.
-    install -Dpm 644 $el %{buildroot}%{elispdir}/$el
-    rm -f $el # clean up to avoid cruft in git-core-doc
-done
-popd >/dev/null
-%endif
-# endif with emacs
 
 %if %{with libsecret}
 install -pm 755 contrib/credential/libsecret/git-credential-libsecret \
@@ -792,13 +762,6 @@ mkdir -p %{buildroot}%{_datadir}/git-core/contrib/completion
 install -pm 644 contrib/completion/git-completion.tcsh \
     %{buildroot}%{_datadir}/git-core/contrib/completion/
 
-# Move contrib/hooks out of %%docdir
-mkdir -p %{buildroot}%{_datadir}/git-core/contrib
-mv contrib/hooks %{buildroot}%{_datadir}/git-core/contrib
-pushd contrib > /dev/null
-ln -s ../../../git-core/contrib/hooks
-popd > /dev/null
-
 # Install git-prompt.sh
 mkdir -p %{buildroot}%{_datadir}/git-core/contrib/completion
 install -pm 644 contrib/completion/git-prompt.sh \
@@ -841,7 +804,7 @@ grep -E  "$not_core_re" bin-man-doc-files > bin-man-doc-git-files
 # contrib
 not_core_doc_re="(git-(cvs|gui|citool|daemon|instaweb|subtree))|p4|svn|email|gitk|gitweb"
 mkdir -p %{buildroot}%{_pkgdocdir}/
-cp -pr CODE_OF_CONDUCT.md README.md Documentation/*.txt Documentation/RelNotes contrib %{buildroot}%{_pkgdocdir}/
+cp -pr CODE_OF_CONDUCT.md README.md Documentation/*.adoc Documentation/RelNotes contrib %{buildroot}%{_pkgdocdir}/
 # Remove contrib/ files/dirs which have nothing useful for documentation
 rm -rf %{buildroot}%{_pkgdocdir}/contrib/{contacts,credential}/
 cp -p gitweb/INSTALL %{buildroot}%{_pkgdocdir}/INSTALL.gitweb
@@ -939,6 +902,17 @@ GIT_SKIP_TESTS="$GIT_SKIP_TESTS t5003.81"
 %endif
 # endif rhel == 9 && arch == s390x
 
+%if "%{_arch}" == "s390x"
+# Skip tests which fail on s390x
+#
+# The following tests are failing on s390x.
+# https://lore.kernel.org/git/4dc4c8cd-c0cc-4784-8fcf-defa3a051087@mit.edu/
+#
+# t8020.16 'cross merge boundaries in blaming'
+# t8020.19 'last-modified merge undoes changes'
+GIT_SKIP_TESTS="$GIT_SKIP_TESTS t8020.16 t8020.19"
+%endif
+# endif "%{_arch}" == "s390x"
 export GIT_SKIP_TESTS
 
 # Set LANG so various UTF-8 tests are run
@@ -986,16 +960,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 # endif use_systemd
 
 %files -f bin-man-doc-git-files
-%if %{with emacs} && %{emacs_filesystem}
-%{elispdir}
-%endif
-# endif with emacs && emacs_filesystem
 %{_datadir}/git-core/contrib/diff-highlight
-%{_datadir}/git-core/contrib/hooks/update-paranoid
-%{_datadir}/git-core/contrib/hooks/setgitperms.perl
-%{_datadir}/git-core/templates/hooks/fsmonitor-watchman.sample
-%{_datadir}/git-core/templates/hooks/pre-rebase.sample
-%{_datadir}/git-core/templates/hooks/prepare-commit-msg.sample
 
 %files all
 # No files for you!
@@ -1007,11 +972,6 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %license COPYING
 # exclude is best way here because of troubles with symlinks inside git-core/
 %exclude %{_datadir}/git-core/contrib/diff-highlight
-%exclude %{_datadir}/git-core/contrib/hooks/update-paranoid
-%exclude %{_datadir}/git-core/contrib/hooks/setgitperms.perl
-%exclude %{_datadir}/git-core/templates/hooks/fsmonitor-watchman.sample
-%exclude %{_datadir}/git-core/templates/hooks/pre-rebase.sample
-%exclude %{_datadir}/git-core/templates/hooks/prepare-commit-msg.sample
 %{bashcomproot}
 %{_datadir}/git-core/
 
@@ -1021,7 +981,6 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %exclude %{_pkgdocdir}/contrib/*/*.py[co]
 %endif
 # endif rhel <= 7
-%{_pkgdocdir}/contrib/hooks
 
 %if %{with libsecret}
 %files credential-libsecret
@@ -1032,7 +991,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 
 %if %{with cvs}
 %files cvs
-%{_pkgdocdir}/*git-cvs*.txt
+%{_pkgdocdir}/*git-cvs*.adoc
 %{_bindir}/git-cvsserver
 %{gitexecdir}/*cvs*
 %{?with_docs:%{_mandir}/man1/*cvs*.1*}
@@ -1041,7 +1000,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 # endif with cvs
 
 %files daemon
-%{_pkgdocdir}/git-daemon*.txt
+%{_pkgdocdir}/git-daemon*.adoc
 %if %{use_systemd}
 %{_unitdir}/git.socket
 %config(noreplace) %{_unitdir}/git@.service
@@ -1062,13 +1021,13 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 # endif with emacs && ! emacs_filesystem
 
 %files email
-%{_pkgdocdir}/*email*.txt
+%{_pkgdocdir}/*email*.adoc
 %{gitexecdir}/*email*
 %{?with_docs:%{_mandir}/man1/*email*.1*}
 %{?with_docs:%{_pkgdocdir}/*email*.html}
 
 %files -n gitk
-%{_pkgdocdir}/*gitk*.txt
+%{_pkgdocdir}/*gitk*.adoc
 %{_bindir}/*gitk*
 %{_datadir}/gitk
 %{?with_docs:%{_mandir}/man1/*gitk*.1*}
@@ -1076,7 +1035,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 
 %files -n gitweb
 %{_pkgdocdir}/*.gitweb
-%{_pkgdocdir}/gitweb*.txt
+%{_pkgdocdir}/gitweb*.adoc
 %{?with_docs:%{_mandir}/man1/gitweb.1*}
 %{?with_docs:%{_mandir}/man5/gitweb.conf.5*}
 %{?with_docs:%{_pkgdocdir}/gitweb*.html}
@@ -1089,8 +1048,8 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %{gitexecdir}/git-citool
 %{_datadir}/applications/*git-gui.desktop
 %{_datadir}/git-gui/
-%{_pkgdocdir}/git-gui.txt
-%{_pkgdocdir}/git-citool.txt
+%{_pkgdocdir}/git-gui.adoc
+%{_pkgdocdir}/git-citool.adoc
 %{?with_docs:%{_mandir}/man1/git-gui.1*}
 %{?with_docs:%{_pkgdocdir}/git-gui.html}
 %{?with_docs:%{_mandir}/man1/git-citool.1*}
@@ -1099,7 +1058,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %files instaweb
 %defattr(-,root,root)
 %{gitexecdir}/git-instaweb
-%{_pkgdocdir}/git-instaweb.txt
+%{_pkgdocdir}/git-instaweb.adoc
 %{?with_docs:%{_mandir}/man1/git-instaweb.1*}
 %{?with_docs:%{_pkgdocdir}/git-instaweb.html}
 
@@ -1107,7 +1066,7 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 %files p4
 %{gitexecdir}/*p4*
 %{gitexecdir}/mergetools/p4merge
-%{_pkgdocdir}/*p4*.txt
+%{_pkgdocdir}/*p4*.adoc
 %{?with_docs:%{_mandir}/man1/*p4*.1*}
 %{?with_docs:%{_pkgdocdir}/*p4*.html}
 %endif
@@ -1120,17 +1079,21 @@ rmdir --ignore-fail-on-non-empty "$testdir"
 
 %files subtree
 %{gitexecdir}/git-subtree
-%{_pkgdocdir}/git-subtree.txt
+%{_pkgdocdir}/git-subtree.adoc
 %{?with_docs:%{_mandir}/man1/git-subtree.1*}
 %{?with_docs:%{_pkgdocdir}/git-subtree.html}
 
 %files svn
 %{gitexecdir}/git-svn
-%{_pkgdocdir}/git-svn.txt
+%{_pkgdocdir}/git-svn.adoc
 %{?with_docs:%{_mandir}/man1/git-svn.1*}
 %{?with_docs:%{_pkgdocdir}/git-svn.html}
 
 %changelog
+* Fri Jan 09 2026 Ondřej Pohořelský <opohorel@redhat.com> - 2.52.0-1
+- update to 2.52.0
+- Resolves: RHEL-118147
+
 * Thu Jul 10 2025 Ondřej Pohořelský <opohorel@redhat.com> - 2.47.3-1
 - update to 2.47.3
 - Resolves: RHEL-102449, RHEL-102463, RHEL-102675, RHEL-102681

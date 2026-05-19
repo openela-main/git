@@ -1,0 +1,85 @@
+From 17acaf144b882d7312b147ac4a1d39158a82534d Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?Ond=C5=99ej=20Poho=C5=99elsk=C3=BD?= <opohorel@redhat.com>
+Date: Fri, 9 Jan 2026 14:49:51 +0100
+Subject: [PATCH] git-2.52.0-core-crypto-hmac.patch
+
+---
+ Makefile               |  2 ++
+ builtin/receive-pack.c | 38 ++++----------------------------------
+ 2 files changed, 6 insertions(+), 34 deletions(-)
+
+diff --git a/Makefile b/Makefile
+index 7e0f77e298..a106eaa79d 100644
+--- a/Makefile
++++ b/Makefile
+@@ -2278,6 +2278,8 @@ ifneq ($(findstring openssl,$(CSPRNG_METHOD)),)
+ 	EXTLIBS += -lcrypto -lssl
+ endif
+ 
++EXTLIBS += -lcrypto
++
+ ifndef HAVE_PLATFORM_PROCINFO
+ 	COMPAT_OBJS += compat/stub/procinfo.o
+ endif
+diff --git a/builtin/receive-pack.c b/builtin/receive-pack.c
+index c9288a9c7e..48ad30fb0a 100644
+--- a/builtin/receive-pack.c
++++ b/builtin/receive-pack.c
+@@ -43,6 +43,8 @@
+ #include "worktree.h"
+ #include "shallow.h"
+ #include "parse-options.h"
++#include <openssl/hmac.h>	
++#include <openssl/evp.h>
+ 
+ static const char * const receive_pack_usage[] = {
+ 	N_("git receive-pack <git-dir>"),
+@@ -561,43 +563,11 @@ static int copy_to_sideband(int in, int out UNUSED, void *arg UNUSED)
+ 	return 0;
+ }
+ 
+-static void hmac_hash(unsigned char *out,
++static inline void hmac_hash(unsigned char *out,
+ 		      const char *key_in, size_t key_len,
+ 		      const char *text, size_t text_len)
+ {
+-	unsigned char key[GIT_MAX_BLKSZ];
+-	unsigned char k_ipad[GIT_MAX_BLKSZ];
+-	unsigned char k_opad[GIT_MAX_BLKSZ];
+-	int i;
+-	struct git_hash_ctx ctx;
+-
+-	/* RFC 2104 2. (1) */
+-	memset(key, '\0', GIT_MAX_BLKSZ);
+-	if (the_hash_algo->blksz < key_len) {
+-		the_hash_algo->init_fn(&ctx);
+-		git_hash_update(&ctx, key_in, key_len);
+-		git_hash_final(key, &ctx);
+-	} else {
+-		memcpy(key, key_in, key_len);
+-	}
+-
+-	/* RFC 2104 2. (2) & (5) */
+-	for (i = 0; i < sizeof(key); i++) {
+-		k_ipad[i] = key[i] ^ 0x36;
+-		k_opad[i] = key[i] ^ 0x5c;
+-	}
+-
+-	/* RFC 2104 2. (3) & (4) */
+-	the_hash_algo->init_fn(&ctx);
+-	git_hash_update(&ctx, k_ipad, sizeof(k_ipad));
+-	git_hash_update(&ctx, text, text_len);
+-	git_hash_final(out, &ctx);
+-
+-	/* RFC 2104 2. (6) & (7) */
+-	the_hash_algo->init_fn(&ctx);
+-	git_hash_update(&ctx, k_opad, sizeof(k_opad));
+-	git_hash_update(&ctx, out, the_hash_algo->rawsz);
+-	git_hash_final(out, &ctx);
++	HMAC(EVP_sha1(), key_in, key_len, text, text_len, out, NULL);
+ }
+ 
+ static char *prepare_push_cert_nonce(const char *path, timestamp_t stamp)
+-- 
+2.52.0
+
